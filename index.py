@@ -1,4 +1,4 @@
-
+import sys
 import os
 import platform
 import subprocess
@@ -8,6 +8,40 @@ from tkinter import messagebox, filedialog
 from yt_dlp import YoutubeDL
 
 
+
+def resource_path(relative_path):
+    
+    if getattr(sys, 'frozen', False):
+        return os.path.join(sys._MEIPASS, relative_path)
+    return os.path.join(os.path.abspath("."), relative_path)
+
+
+ffmpeg_path = resource_path("assets/ffmpeg.exe")
+ffprobe_path = resource_path("assets/ffprobe.exe")
+
+
+
+
+def get_ffmpeg_folder():
+    sistema = platform.system()
+
+    # Caminhos embutidos (dentro do executável/pasta assets)
+    ffmpeg_embutido = resource_path("assets/ffmpeg.exe" if sistema == "Windows" else "assets/ffmpeg")
+    ffprobe_embutido = resource_path("assets/ffprobe.exe" if sistema == "Windows" else "assets/ffprobe")
+
+    if os.path.isfile(ffmpeg_embutido) and os.path.isfile(ffprobe_embutido):
+        return os.path.dirname(ffmpeg_embutido)
+
+    # Windows: tenta pasta externa padrão
+    if sistema == "Windows":
+        pasta_externa = r"C:\ffmpeg"
+        ffmpeg_externo = os.path.join(pasta_externa, "ffmpeg.exe")
+        ffprobe_externo = os.path.join(pasta_externa, "ffprobe.exe")
+        if os.path.isfile(ffmpeg_externo) and os.path.isfile(ffprobe_externo):
+            return pasta_externa
+
+    # Linux/macOS ou fallback: confiar no PATH
+    return None
 
 
 def escolher_caminho(entry_var):
@@ -46,17 +80,27 @@ def baixar_audio(url, caminho_completo, status_label, limpar_campos):
 
         caminho_sem_ext = os.path.splitext(caminho_completo)[0]
 
+        sistema = platform.system()
+
+        if sistema == 'Windows':
+            ffmpeg_dir = os.path.dirname(ffmpeg_path)
+        else:
+            ffmpeg_dir = None  # Confia nos binários do sistema
+
         ydl_opts = {
             'format': 'bestaudio/best',
-            'outtmpl': caminho_sem_ext + '.%(ext)s',  
+            'outtmpl': caminho_sem_ext + '.%(ext)s',
             'postprocessors': [{
                 'key': 'FFmpegExtractAudio',
                 'preferredcodec': 'mp3',
                 'preferredquality': '192',
-              }],
+            }],
             'quiet': False,
             'noplaylist': True
         }
+
+        if ffmpeg_dir:
+            ydl_opts['ffmpeg_location'] = ffmpeg_dir
 
         with YoutubeDL(ydl_opts) as ydl:
             ydl.download([url])
@@ -72,6 +116,9 @@ def baixar_audio(url, caminho_completo, status_label, limpar_campos):
 
     except Exception as e:
         status_label.config(text=f"❌ Erro: {e}", fg="red")
+
+
+
 
 def start_download(entry_url, caminho_saida, status_label):
     url = entry_url.get()
